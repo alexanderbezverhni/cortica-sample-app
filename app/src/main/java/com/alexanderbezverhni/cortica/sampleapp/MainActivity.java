@@ -53,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
 	private static final int REQUEST_PICK_AN_IMAGE = 9162;
 
 	private static final long POLLING_PERIOD_MS = DateUtils.SECOND_IN_MILLIS * 5;
+	private static final long POLLING_THRESHOLD_MS = DateUtils.MINUTE_IN_MILLIS * 5;
 
 	@BindView(R.id.scroller)
 	ScrollView scroller;
@@ -69,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
 
 	private Timer timer;
 	private TimerTask timerTask;
+	private long pollingStart;
 
 	private CorticaService service;
 	private String deviceId;
@@ -131,13 +133,21 @@ public class MainActivity extends AppCompatActivity {
 				if (tags != null && !tags.isEmpty()) {
 					onTagsReceived(tags);
 				}
+				checkPollingDuration();
 			}
 
 			@Override
 			public void onFailure(Call<Tags> call, Throwable t) {
-				// do nothing
+				checkPollingDuration();
 			}
 		});
+	}
+
+	private void checkPollingDuration() {
+		long now = System.currentTimeMillis();
+		if (now - pollingStart > POLLING_THRESHOLD_MS) {
+			stopPolling();
+		}
 	}
 
 	private void onTagsReceived(List<String> tags) {
@@ -190,6 +200,7 @@ public class MainActivity extends AppCompatActivity {
 			}
 		};
 		timer.schedule(timerTask, 0, POLLING_PERIOD_MS);
+		pollingStart = System.currentTimeMillis();
 	}
 
 	private void stopPolling() {
