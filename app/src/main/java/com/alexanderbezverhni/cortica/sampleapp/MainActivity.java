@@ -50,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
 	ImageView image;
 
 	private CorticaService service;
+	private String deviceId;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -58,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
 		ButterKnife.bind(this);
 
 		setSupportActionBar(toolbar);
-
+		deviceId = Utils.getDeviceId(this);
 		initRetrofit();
 	}
 
@@ -66,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
 		OkHttpClient httpClient = new OkHttpClient.Builder().addInterceptor(new Interceptor() {
 			@Override
 			public okhttp3.Response intercept(Chain chain) throws IOException {
-				Request request = chain.request().newBuilder().addHeader("uId", Utils.getUserId()).addHeader("apiKey",
+				Request request = chain.request().newBuilder().addHeader("uId", deviceId).addHeader("apiKey",
 						CorticaService.HEADER_API_KEY).addHeader("clientVersion", CorticaService.HEADER_CLIENT_VERSION).build();
 				return chain.proceed(request);
 			}

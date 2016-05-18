@@ -11,6 +11,7 @@ import android.os.Environment;
 import android.provider.BaseColumns;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
+import android.provider.Settings;
 
 import java.io.File;
 
@@ -26,8 +27,8 @@ public class Utils {
 		return API_ID_PREFIX + String.valueOf(now);
 	}
 
-	public static String getUserId() {
-		return getImageId();
+	public static String getDeviceId(Context context) {
+		return Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
 	}
 
 	/**
