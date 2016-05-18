@@ -1,9 +1,11 @@
 package com.alexanderbezverhni.cortica.sampleapp.api;
 
+import com.alexanderbezverhni.cortica.sampleapp.api.model.Tags;
 import com.alexanderbezverhni.cortica.sampleapp.api.model.UploadResponse;
 
 import okhttp3.MultipartBody;
 import retrofit2.Call;
+import retrofit2.http.GET;
 import retrofit2.http.Multipart;
 import retrofit2.http.POST;
 import retrofit2.http.Part;
@@ -19,4 +21,7 @@ public interface CorticaService {
 	@Multipart
 	@POST("photos/upload")
 	Call<UploadResponse> upload(@Part MultipartBody.Part file, @Query("pId") String pId, @Query("batchSize") String batchSize);
+
+	@GET("tags")
+	Call<Tags> getTags();
 }

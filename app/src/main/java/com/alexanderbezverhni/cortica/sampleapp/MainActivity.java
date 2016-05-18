@@ -11,16 +11,25 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
+import android.text.format.DateUtils;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.alexanderbezverhni.cortica.sampleapp.api.CorticaService;
+import com.alexanderbezverhni.cortica.sampleapp.api.model.Photo;
+import com.alexanderbezverhni.cortica.sampleapp.api.model.Tag;
+import com.alexanderbezverhni.cortica.sampleapp.api.model.Tags;
 import com.alexanderbezverhni.cortica.sampleapp.api.model.UploadResponse;
 import com.squareup.picasso.Picasso;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -42,15 +51,26 @@ public class MainActivity extends AppCompatActivity {
 	private static final int REQUEST_STORAGE_PERMISSIONS_CODE = 13;
 	private static final int REQUEST_PICK_AN_IMAGE = 9162;
 
+	private static final long POLLING_PERIOD_MS = DateUtils.SECOND_IN_MILLIS * 5;
+
 	@BindView(R.id.toolbar)
 	Toolbar toolbar;
 	@BindView(R.id.card_view)
 	View imageContainer;
 	@BindView(R.id.image)
 	ImageView image;
+	@BindView(R.id.tags)
+	TextView tags;
+	@BindView(R.id.tags_title)
+	TextView tagsTitle;
+
+	private Timer timer;
+	private TimerTask timerTask;
 
 	private CorticaService service;
 	private String deviceId;
+	private Uri selectedImageUri;
+	private String imageServerId;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -78,18 +98,6 @@ public class MainActivity extends AppCompatActivity {
 		service = retrofit.create(CorticaService.class);
 	}
 
-	@OnClick(R.id.fab)
-	public void onFabClick() {
-		boolean permissionGranted = ContextCompat.checkSelfPermission(this,
-				Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
-		if (permissionGranted) {
-			pickImage();
-		} else {
-			ActivityCompat.requestPermissions(this, new String[]{ Manifest.permission.READ_EXTERNAL_STORAGE },
-					REQUEST_STORAGE_PERMISSIONS_CODE);
-		}
-	}
-
 	private void pickImage() {
 		Intent intent = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*");
 		try {
@@ -99,32 +107,90 @@ public class MainActivity extends AppCompatActivity {
 		}
 	}
 
-	@Override
-	public void onActivityResult(int requestCode, int resultCode, Intent data) {
-		super.onActivityResult(requestCode, resultCode, data);
-
-		if (resultCode == RESULT_OK && requestCode == REQUEST_PICK_AN_IMAGE) {
-			Uri uri = data.getData();
-			if (uri != null) {
-				onImageSelected(uri);
-			}
-		}
-	}
-
 	private void onImageSelected(Uri uri) {
 		imageContainer.setVisibility(View.VISIBLE);
-		Picasso.with(this).load(uri).into(image);
-		uploadImage(uri);
+		selectedImageUri = uri;
+		Picasso.with(this).load(selectedImageUri).into(image);
+		uploadImage(selectedImageUri);
+		startPollingForTags();
 	}
 
-	@Override
-	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-		if (requestCode == REQUEST_STORAGE_PERMISSIONS_CODE) {
-			if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-				pickImage();
-			} else {
-				showToast(R.string.storage_permission_denied);
+	private void fetchTags() {
+		Call<Tags> call = service.getTags();
+		call.enqueue(new Callback<Tags>() {
+			@Override
+			public void onResponse(Call<Tags> call, Response<Tags> response) {
+				List<String> tags = getTagsLabels(response.body());
+				if (tags != null && !tags.isEmpty()) {
+					onTagsReceived(tags);
+				}
 			}
+
+			@Override
+			public void onFailure(Call<Tags> call, Throwable t) {
+				// do nothing
+			}
+		});
+	}
+
+	private void onTagsReceived(List<String> tags) {
+		stopPolling();
+
+		StringBuilder concatenated = new StringBuilder();
+		for (String tag : tags) {
+			concatenated.append(tag).append("\n");
+		}
+
+		tagsTitle.setVisibility(View.VISIBLE);
+		this.tags.setVisibility(View.VISIBLE);
+		this.tags.setText(concatenated);
+	}
+
+	private List<String> getTagsLabels(Tags payload) {
+		List<String> tagsLabels = new ArrayList<>();
+
+		if (payload == null) {
+			return null;
+		}
+
+		List<Tag> tags = payload.getTags();
+		if (tags == null || tags.isEmpty()) {
+			return null;
+		}
+
+		for (Tag tag : tags) {
+			List<Photo> photos = tag.getPhotos();
+			if (photos != null && !photos.isEmpty()) {
+				for (Photo photo : photos) {
+					if (imageServerId.equals(photo.getImageId())) {
+						tagsLabels.add(tag.getLabel());
+						break;
+					}
+				}
+			}
+		}
+
+		return tagsLabels;
+	}
+
+	private void startPollingForTags() {
+		stopPolling();
+		timer = new Timer("cortica_tags_poller");
+		timerTask = new TimerTask() {
+			@Override
+			public void run() {
+				fetchTags();
+			}
+		};
+		timer.schedule(timerTask, 0, POLLING_PERIOD_MS);
+	}
+
+	private void stopPolling() {
+		if (timer != null) {
+			timerTask.cancel();
+			timer.cancel();
+			timer = null;
+			timerTask = null;
 		}
 	}
 
@@ -140,12 +206,12 @@ public class MainActivity extends AppCompatActivity {
 		MultipartBody.Part body = MultipartBody.Part.createFormData("image", file.getName(), requestFile);
 
 		// finally, execute the request
-		String imageId = Utils.getImageId();
-		Call<UploadResponse> call = service.upload(body, imageId, CorticaService.BATCH_SIZE);
+		imageServerId = Utils.getImageId();
+		Call<UploadResponse> call = service.upload(body, imageServerId, CorticaService.BATCH_SIZE);
 		call.enqueue(new Callback<UploadResponse>() {
 			@Override
 			public void onResponse(Call<UploadResponse> call, Response<UploadResponse> response) {
-				boolean success = !TextUtils.isEmpty(response.body().pid);
+				boolean success = !TextUtils.isEmpty(response.body().getImageId());
 				if (success) {
 					onUploadSuccess();
 				} else {
@@ -170,5 +236,40 @@ public class MainActivity extends AppCompatActivity {
 
 	private void showToast(int textResId) {
 		Toast.makeText(this, textResId, Toast.LENGTH_LONG).show();
+	}
+
+	@Override
+	public void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+
+		if (resultCode == RESULT_OK && requestCode == REQUEST_PICK_AN_IMAGE) {
+			Uri uri = data.getData();
+			if (uri != null) {
+				onImageSelected(uri);
+			}
+		}
+	}
+
+	@OnClick(R.id.fab)
+	public void onFabClick() {
+		boolean permissionGranted = ContextCompat.checkSelfPermission(this,
+				Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+		if (permissionGranted) {
+			pickImage();
+		} else {
+			ActivityCompat.requestPermissions(this, new String[]{ Manifest.permission.READ_EXTERNAL_STORAGE },
+					REQUEST_STORAGE_PERMISSIONS_CODE);
+		}
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+		if (requestCode == REQUEST_STORAGE_PERMISSIONS_CODE) {
+			if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+				pickImage();
+			} else {
+				showToast(R.string.storage_permission_denied);
+			}
+		}
 	}
 }

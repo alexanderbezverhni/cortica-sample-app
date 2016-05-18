@@ -4,4 +4,5 @@
     <string name="storage_permission_denied">Storage permission denied</string>
     <string name="upload_failure_mes">Failed to upload an image</string>
     <string name="upload_success_mes">Image upload succeed!</string>
+    <string name="tags_title">Tags:</string>
 </resources>

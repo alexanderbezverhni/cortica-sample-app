@@ -1,10 +1,10 @@
 package com.alexanderbezverhni.cortica.sampleapp.api.model;
 
-public class UploadResponse {
+public class Photo {
 
-	private String pid;
+	private String pId;
 
 	public String getImageId() {
-		return pid;
+		return pId;
 	}
 }
