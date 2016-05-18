@@ -112,8 +112,8 @@ public class MainActivity extends AppCompatActivity {
 	private void onImageSelected(Uri uri) {
 		scroller.fullScroll(View.FOCUS_UP);
 		showToast(R.string.upload_start_mes);
-		tagsTitle.setVisibility(View.INVISIBLE);
-		tags.setVisibility(View.INVISIBLE);
+		tagsTitle.setVisibility(View.GONE);
+		tags.setVisibility(View.GONE);
 
 		imageContainer.setVisibility(View.VISIBLE);
 		Picasso.with(this).load(uri).into(image);
