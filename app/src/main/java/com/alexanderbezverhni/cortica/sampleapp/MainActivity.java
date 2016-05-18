@@ -10,14 +10,32 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.alexanderbezverhni.cortica.sampleapp.api.CorticaService;
+import com.alexanderbezverhni.cortica.sampleapp.api.model.UploadResponse;
 import com.squareup.picasso.Picasso;
+
+import java.io.File;
+import java.io.IOException;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
+import okhttp3.Interceptor;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -26,8 +44,12 @@ public class MainActivity extends AppCompatActivity {
 
 	@BindView(R.id.toolbar)
 	Toolbar toolbar;
+	@BindView(R.id.card_view)
+	View imageContainer;
 	@BindView(R.id.image)
 	ImageView image;
+
+	private CorticaService service;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -36,6 +58,23 @@ public class MainActivity extends AppCompatActivity {
 		ButterKnife.bind(this);
 
 		setSupportActionBar(toolbar);
+
+		initRetrofit();
+	}
+
+	private void initRetrofit() {
+		OkHttpClient httpClient = new OkHttpClient.Builder().addInterceptor(new Interceptor() {
+			@Override
+			public okhttp3.Response intercept(Chain chain) throws IOException {
+				Request request = chain.request().newBuilder().addHeader("uId", Utils.getUserId()).addHeader("apiKey",
+						CorticaService.HEADER_API_KEY).addHeader("clientVersion", CorticaService.HEADER_CLIENT_VERSION).build();
+				return chain.proceed(request);
+			}
+		}).build();
+
+		Retrofit retrofit = new Retrofit.Builder().baseUrl(CorticaService.CORTICA_API_ENDPOINT).addConverterFactory(
+				GsonConverterFactory.create()).client(httpClient).build();
+		service = retrofit.create(CorticaService.class);
 	}
 
 	@OnClick(R.id.fab)
@@ -55,7 +94,7 @@ public class MainActivity extends AppCompatActivity {
 		try {
 			startActivityForResult(intent, REQUEST_PICK_AN_IMAGE);
 		} catch (ActivityNotFoundException e) {
-			Toast.makeText(this, R.string.no_images_found, Toast.LENGTH_LONG).show();
+			showToast(R.string.no_images_found);
 		}
 	}
 
@@ -72,8 +111,9 @@ public class MainActivity extends AppCompatActivity {
 	}
 
 	private void onImageSelected(Uri uri) {
+		imageContainer.setVisibility(View.VISIBLE);
 		Picasso.with(this).load(uri).into(image);
-		// TODO: dispath requests
+		uploadImage(uri);
 	}
 
 	@Override
@@ -82,8 +122,52 @@ public class MainActivity extends AppCompatActivity {
 			if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
 				pickImage();
 			} else {
-				Toast.makeText(this, R.string.storage_permission_denied, Toast.LENGTH_LONG).show();
+				showToast(R.string.storage_permission_denied);
 			}
 		}
+	}
+
+	private void uploadImage(Uri fileUri) {
+		// use the Utils to get the actual file by uri
+		String filePath = Utils.getPath(this, fileUri);
+		File file = new File(filePath);
+
+		// create RequestBody instance from file
+		RequestBody requestFile = RequestBody.create(MediaType.parse("multipart/form-data"), file);
+
+		// MultipartBody.Part is used to send also the actual file name
+		MultipartBody.Part body = MultipartBody.Part.createFormData("image", file.getName(), requestFile);
+
+		// finally, execute the request
+		String imageId = Utils.getImageId();
+		Call<UploadResponse> call = service.upload(body, imageId, CorticaService.BATCH_SIZE);
+		call.enqueue(new Callback<UploadResponse>() {
+			@Override
+			public void onResponse(Call<UploadResponse> call, Response<UploadResponse> response) {
+				boolean success = !TextUtils.isEmpty(response.body().pid);
+				if (success) {
+					onUploadSuccess();
+				} else {
+					onUploadFailure();
+				}
+			}
+
+			@Override
+			public void onFailure(Call<UploadResponse> call, Throwable t) {
+				onUploadFailure();
+			}
+		});
+	}
+
+	private void onUploadFailure() {
+		showToast(R.string.upload_failure_mes);
+	}
+
+	private void onUploadSuccess() {
+		showToast(R.string.upload_success_mes);
+	}
+
+	private void showToast(int textResId) {
+		Toast.makeText(this, textResId, Toast.LENGTH_LONG).show();
 	}
 }
