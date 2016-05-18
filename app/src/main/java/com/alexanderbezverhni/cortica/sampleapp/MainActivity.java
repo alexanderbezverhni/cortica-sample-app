@@ -72,7 +72,6 @@ public class MainActivity extends AppCompatActivity {
 
 	private CorticaService service;
 	private String deviceId;
-	private Uri selectedImageUri;
 	private String imageServerId;
 
 	@Override
@@ -117,10 +116,9 @@ public class MainActivity extends AppCompatActivity {
 		tags.setVisibility(View.INVISIBLE);
 
 		imageContainer.setVisibility(View.VISIBLE);
-		selectedImageUri = uri;
-		Picasso.with(this).load(selectedImageUri).into(image);
+		Picasso.with(this).load(uri).into(image);
 
-		uploadImage(selectedImageUri);
+		uploadImage(uri);
 		startPollingForTags();
 	}
 
