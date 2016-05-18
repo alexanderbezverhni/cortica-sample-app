@@ -3,6 +3,7 @@
     <string name="no_images_found">No images found</string>
     <string name="storage_permission_denied">Storage permission denied</string>
     <string name="upload_failure_mes">Failed to upload an image</string>
-    <string name="upload_success_mes">Image upload succeed!</string>
+    <string name="upload_success_mes">Searching for the tags&#8230;</string>
     <string name="tags_title">Tags:</string>
+    <string name="upload_start_mes">Uploading the image&#8230;</string>
 </resources>

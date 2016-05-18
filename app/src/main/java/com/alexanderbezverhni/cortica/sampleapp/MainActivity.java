@@ -14,6 +14,7 @@ import android.text.TextUtils;
 import android.text.format.DateUtils;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -53,6 +54,8 @@ public class MainActivity extends AppCompatActivity {
 
 	private static final long POLLING_PERIOD_MS = DateUtils.SECOND_IN_MILLIS * 5;
 
+	@BindView(R.id.scroller)
+	ScrollView scroller;
 	@BindView(R.id.toolbar)
 	Toolbar toolbar;
 	@BindView(R.id.card_view)
@@ -108,9 +111,15 @@ public class MainActivity extends AppCompatActivity {
 	}
 
 	private void onImageSelected(Uri uri) {
+		scroller.fullScroll(View.FOCUS_UP);
+		showToast(R.string.upload_start_mes);
+		tagsTitle.setVisibility(View.INVISIBLE);
+		tags.setVisibility(View.INVISIBLE);
+
 		imageContainer.setVisibility(View.VISIBLE);
 		selectedImageUri = uri;
 		Picasso.with(this).load(selectedImageUri).into(image);
+
 		uploadImage(selectedImageUri);
 		startPollingForTags();
 	}
@@ -235,7 +244,7 @@ public class MainActivity extends AppCompatActivity {
 	}
 
 	private void showToast(int textResId) {
-		Toast.makeText(this, textResId, Toast.LENGTH_LONG).show();
+		Toast.makeText(this, textResId, Toast.LENGTH_SHORT).show();
 	}
 
 	@Override
